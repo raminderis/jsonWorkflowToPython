@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sut_management"
+version = "0.1.0"
+description = "Modular package to reserve and release SUTs"
+authors = [{ name = "Raminder", email = "you@example.com" }]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []

@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+sut_management/__init__.py
+sut_management/sutManager.py
+sut_management.egg-info/PKG-INFO
+sut_management.egg-info/SOURCES.txt
+sut_management.egg-info/dependency_links.txt
+sut_management.egg-info/top_level.txt
