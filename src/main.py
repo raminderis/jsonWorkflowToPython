@@ -21,32 +21,36 @@ async def publish_tram_results(results):
     return True
 
 async def handle_state_change(result):
-    # Placeholder for handling state change
     print(f"Handling state change: {result}")
-    if result == "IN PROGRESS":
-        print("Test is in progress...")
-        print("Fetching TRAM results...")
-        tram_results = await fetch_tram_result()
-        print(f"TRAM Results: {tram_results}")
-        print("Publishing intermediate results...")
-        # Publish the TRAM results
-        await publish_tram_results(tram_results)
-    elif result == "COMPLETED":
-        print("fetching final TRAM results...")
-        tram_results = await fetch_tram_result()
-        print(f"Final TRAM Results: {tram_results}")
-        print("Publishing final results...")
-        await publish_tram_results(tram_results)
-    elif result == "ERROR":
-        print("Test has encountered an error.")
-    elif result == "UNAVAILABLE":
-        print("Test session is unavailable.")
-    elif result == "PAUSED":
-        print("Test session is paused. User to take action we will wait for 10 seconds.")
-        # Here you might want to implement logic to notify the user or take specific actions
-        await asyncio.sleep(10)  # Simulate waiting for user action
-    else:
-        print(f"No specific handler for session state: {result}")
+
+    match result:
+        case "IN PROGRESS":
+            print("Test is in progress...")
+            print("Fetching TRAM results...")
+            tram_results = await fetch_tram_result()
+            print(f"TRAM Results: {tram_results}")
+            print("Publishing intermediate results...")
+            await publish_tram_results(tram_results)
+
+        case "COMPLETED":
+            print("Fetching final TRAM results...")
+            tram_results = await fetch_tram_result()
+            print(f"Final TRAM Results: {tram_results}")
+            print("Publishing final results...")
+            await publish_tram_results(tram_results)
+
+        case "ERROR":
+            print("Test has encountered an error.")
+
+        case "UNAVAILABLE":
+            print("Test session is unavailable.")
+
+        case "PAUSED":
+            print("Test session is paused. User to take action — we will wait for 10 seconds.")
+            await asyncio.sleep(10)
+
+        case _:
+            print(f"No specific handler for session state: {result}")
 
 poll_interval = 10  # seconds
 
@@ -130,7 +134,7 @@ async def main(config):
     reserved_suts = sut_manager.get_all_suts_reserved()
     print(f"All Reserved SUTs: {reserved_suts}")
 
-    
+
     print("Workflow completed successfully.")
 
 
