@@ -1,0 +1,24 @@
+{
+    "workflow": {
+        "workflowId": "wf-001",
+        "input": {
+            "test": {
+                "name": "raminder",
+                "tas": "testtas",
+                "testServers": [
+                    "server1",
+                    "server2"
+                ],
+                "parameters": {
+                    "Ts0Tc0": {
+                        "MmeSut": "sut-124"
+                    }
+                },
+                "iterations": 100
+            },
+            "security": {
+                "username": "raminder"
+            }
+        }
+    }
+}

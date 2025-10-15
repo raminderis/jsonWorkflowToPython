@@ -2,7 +2,8 @@ import requests
 
 class RESULTSManager:
     def __init__(self):
-        self.reservation_url = "http://us-tram:3040/api/v1/results"
+        # self.reservation_url = "http://us-tram:3040/api/v1/results"
+        self.reservation_url = "http://localhost:8080/api/v1/results"
 
     def get_tram_results(self, testId):
         # Placeholder for getting TRAM results

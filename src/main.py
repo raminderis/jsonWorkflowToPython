@@ -1,16 +1,72 @@
+import asyncio
+import argparse, json
 from sut_management import SUTManager
 from test_management import TESTManager, RESULTSManager
 
-def main():
+async def get_session_state(test_session_id):
+    # Placeholder for getting session state
+    test_manager = TESTManager()
+    session_info = test_manager.get_session(test_session_id)
+    return session_info.get("status", "unknown")
+
+async def fetch_tram_result():
+    # Placeholder for fetching TRAM result
+    await asyncio.sleep(5)
+    return {"result": "sample_result"}
+
+async def publish_tram_results(results):
+    # Placeholder for publishing TRAM results
+    print(f"Publishing TRAM results to Kafka: {results}")
+    await asyncio.sleep(1)
+    return True
+
+async def handle_state_change(result):
+    # Placeholder for handling state change
+    print(f"Handling state change: {result}")
+    if result == "IN PROGRESS":
+        print("Test is in progress...")
+        print("Fetching TRAM results...")
+        tram_results = await fetch_tram_result()
+        print(f"TRAM Results: {tram_results}")
+        print("Publishing intermediate results...")
+        # Publish the TRAM results
+        await publish_tram_results(tram_results)
+    elif result == "COMPLETED":
+        print("fetching final TRAM results...")
+        tram_results = await fetch_tram_result()
+        print(f"Final TRAM Results: {tram_results}")
+        print("Publishing final results...")
+        await publish_tram_results(tram_results)
+    elif result == "ERROR":
+        print("Test has encountered an error.")
+    elif result == "UNAVAILABLE":
+        print("Test session is unavailable.")
+    elif result == "PAUSED":
+        print("Test session is paused. User to take action we will wait for 10 seconds.")
+        # Here you might want to implement logic to notify the user or take specific actions
+        await asyncio.sleep(10)  # Simulate waiting for user action
+    else:
+        print(f"No specific handler for session state: {result}")
+
+poll_interval = 10  # seconds
+
+async def main(config):
     sut_manager = SUTManager()
 
-    # Reserve a SUT
-    sut_name = "example_sut"
-    workflow_id = "workflow_123"
-    user_name = "user_abc"
+    # TASK 1: set_sut_reservation
+    # TASK 2: set_sut_reservation_decision
+    workflow_id = config.get("workflow", {}).get("workflowId", "workflow_123")
+    user_name = config.get("workflow", {}).get("input", {}).get("security", {}).get("username", "user_abc")
+    sut_name = config.get("workflow", {}).get("input", {}).get("test", {}).get("parameters", {}).get("Ts0Tc0", {}).get("MmeSut", "default_sut")
+    test_name = config.get("workflow", {}).get("input", {}).get("test", {}).get("name", "default_test")
+    test_tas = config.get("workflow", {}).get("input", {}).get("test", {}).get("tas", "default_tas")
+    test_servers = config.get("workflow", {}).get("input", {}).get("test", {}).get("testServers", ["default_server"])
+    test_libraryId = config.get("workflow", {}).get("input", {}).get("test", {}).get("libraryId", 0)
+    parameters = config.get("workflow", {}).get("input", {}).get("test", {}).get("parameters", {})
+    print(f"Workflow ID: {workflow_id}, User Name: {user_name}, SUT Name: {sut_name}")
     try:
-        sut_id = sut_manager.reserve_sut(sut_name, workflow_id, user_name)
-        print(f"Reserved SUT ID: {sut_id}")
+        sutReservationResponse = sut_manager.reserve_sut(sut_name, workflow_id, user_name)
+        print(f"SUT Reservation Response: {sutReservationResponse}")
     except Exception as e:
         print(f"Error reserving SUT: {e}")
         print(f"SUT is busy or not available. Terminating the workflow.")
@@ -20,53 +76,69 @@ def main():
     reserved_suts = sut_manager.get_all_suts_reserved()
     print(f"All Reserved SUTs: {reserved_suts}")
 
-    # Create a test session
+    
+
+    # TASK 3: create_test_session
     test_manager = TESTManager()
-    test_id = "test_456"
-    if test_manager.create_testSession(test_id):
-        print(f"Test session created for Test ID: {test_id}")
+    test_session_response = test_manager.create_testSession(test_name, test_tas, test_servers, test_libraryId)
+    if test_session_response is not None:
+        test_session_id = test_session_response.get("id")
+        print(f"Test session created for Test Name: {test_name} with Session ID: {test_session_id}")
     else:
-        print(f"Failed to create test session for Test ID: {test_id}")
+        print(f"Failed to create test session for Test Name: {test_name}")
         exit(1)
     
-    # Run the test
-    if test_manager.run_test(test_id):
-        print(f"Test running for Test ID: {test_id}")
+
+    # TASK 4: execute_test
+    if test_manager.run_test(test_session_id, parameters):
+        print(f"Test started for Test Name: {test_name} with Session ID: {test_session_id}")
     else:
-        print(f"Failed to run test for Test ID: {test_id}")
+        print(f"Failed to run test for Test Name: {test_name}")
         exit(1)
 
-    # Get the test session results
-    results_manager = RESULTSManager()
-    results = results_manager.get_tram_results(test_id)
-    print(f"Test results for Test ID {test_id}: {results}")
+    # Task 5: handle_execution_state
+    known_session_state = "NONE"
+    intervalCounter = 0
+    while True and intervalCounter < 20:
+        try:
+            new_session_state = await get_session_state(test_session_id)
+            if new_session_state != known_session_state:
+                print(f"Session state changed from {known_session_state} to {new_session_state}")
+                await handle_state_change(new_session_state)
+                known_session_state = new_session_state
+            if known_session_state in ["COMPLETED", "ERROR"]:
+                print("Session ended.")
+                break
+            print(f"Waiting for {poll_interval} seconds before next state check...")
+            intervalCounter += 1
+            await asyncio.sleep(poll_interval)
+        except Exception as e:
+            print(f"Error while checking session state: {e}")
+            await asyncio.sleep(poll_interval)
 
-    print("evaluate results and decide pass/fail...")
-    print("in progress publish to Kafka...")
-    print("publish results... done")
-    print("proceed with cleanup...")
-    # Stop the test
-    if test_manager.stop_test(test_id):
-        print(f"Test stopped for Test ID: {test_id}")
-    else:
-        print(f"Failed to stop test for Test ID: {test_id}")
-        exit(1)
-
-    # Delete the test session
-    if test_manager.delete_testSession(test_id):
-        print(f"Test session deleted for Test ID: {test_id}")
-    else:
-        print(f"Failed to delete test session for Test ID: {test_id}")
-        exit(1)
-
-    # Remove the reserved SUT
-    sut_id = 1
+    # TASK 6: remove_sut_reservation
+    reserved_suts = sut_manager.get_all_suts_reserved()
+    sutId = reserved_suts.get(sut_name)
     try:
-        sut_manager.remove_sut(sut_id)
-        print(f"SUT ID {sut_id} successfully removed.")
+        sutRemovalResponse = sut_manager.remove_sut(sutId)
+        print(f"SUT Removal Response: {sutRemovalResponse}")
     except Exception as e:
-        print(f"Failed to remove SUT ID {sut_id} with error: {e}")
+        print(f"Error removing SUT: {e}")
+        exit(1)
+
+    # Get all reserved SUTs
+    reserved_suts = sut_manager.get_all_suts_reserved()
+    print(f"All Reserved SUTs: {reserved_suts}")
+
+    
+    print("Workflow completed successfully.")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="SUT and Test Management Workflow")
+    parser.add_argument("--config", "-c", default="config.json", help="Path to the config file")
+    args = parser.parse_args()
+    config_path = args.config
+    with open(config_path, "r") as config_file:
+        config = json.load(config_file)
+    asyncio.run(main(config))
